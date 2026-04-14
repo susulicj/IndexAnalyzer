@@ -133,5 +133,94 @@ namespace Services
 
             return result;
         }
+
+        public async Task<object> AnalyzeQueryWithMetrics(string query)
+        {
+            using var conn = new SqlConnection(_connectionString);
+
+            string messages = "";
+            conn.FireInfoMessageEventOnUserErrors = true;
+
+            conn.InfoMessage += (sender, e) =>
+            {
+                messages += e.Message + "\n";
+            };
+
+            await conn.OpenAsync();
+
+            var cmdText = $@"
+                SET STATISTICS IO ON;
+                SET STATISTICS TIME ON;
+
+                {query}
+
+                SET STATISTICS IO OFF;
+                SET STATISTICS TIME OFF;
+                ";
+
+            var stopwatch = Stopwatch.StartNew();
+
+            using var cmd = new SqlCommand(cmdText, conn);
+            await cmd.ExecuteNonQueryAsync();
+
+            stopwatch.Stop();
+
+         
+            return new
+            {
+                ExecutionTimeMs = stopwatch.ElapsedMilliseconds,
+               
+                RawMessages = messages 
+            };
+        }
+        private object ParseMetrics(string messages)
+        {
+            int logicalReads = 0;
+            int physicalReads = 0;
+            int cpuTime = 0;
+
+            var lines = messages.Split('\n');
+
+            foreach (var line in lines)
+            {
+                if (line.Contains("logical reads"))
+                {
+                    var parts = line.Split(',');
+
+                    foreach (var p in parts)
+                    {
+                        if (p.Contains("logical reads"))
+                        {
+                            var val = p.Split('=')[1].Trim();
+                            logicalReads = int.Parse(val);
+                        }
+
+                        if (p.Contains("physical reads"))
+                        {
+                            var val = p.Split('=')[1].Trim();
+                            physicalReads = int.Parse(val);
+                        }
+                    }
+                }
+
+                if (line.Contains("CPU time"))
+                {
+                    var parts = line.Split(',');
+
+                    var cpuPart = parts[0].Split('=')[1]
+                        .Replace("ms", "")
+                        .Trim();
+
+                    cpuTime = int.Parse(cpuPart);
+                }
+            }
+
+            return new
+            {
+                LogicalReads = logicalReads,
+                PhysicalReads = physicalReads,
+                CpuTimeMs = cpuTime
+            };
+        }
     }
 }
