@@ -134,7 +134,7 @@ namespace Services
             return result;
         }
 
-        public async Task<object> AnalyzeQueryWithMetrics(string query)
+        public async Task<object> AnalyzeQueryWithMetrics(string query, string tableName, bool useIndex, string indexName = null)
         {
             using var conn = new SqlConnection(_connectionString);
 
@@ -148,15 +148,21 @@ namespace Services
 
             await conn.OpenAsync();
 
+            var modifiedQuery = ApplyIndexHint(
+                query,
+                tableName,
+                useIndex ? indexName : null
+            );
+
             var cmdText = $@"
-                SET STATISTICS IO ON;
-                SET STATISTICS TIME ON;
+            SET STATISTICS IO ON;
+            SET STATISTICS TIME ON;
 
-                {query}
+            {modifiedQuery}
 
-                SET STATISTICS IO OFF;
-                SET STATISTICS TIME OFF;
-                ";
+            SET STATISTICS IO OFF;
+            SET STATISTICS TIME OFF;
+            ";
 
             var stopwatch = Stopwatch.StartNew();
 
@@ -165,12 +171,12 @@ namespace Services
 
             stopwatch.Stop();
 
-         
+
             return new
             {
+                UseIndex = useIndex,
                 ExecutionTimeMs = stopwatch.ElapsedMilliseconds,
-               
-                RawMessages = messages 
+                RawMessages = messages
             };
         }
         private object ParseMetrics(string messages)
@@ -221,6 +227,19 @@ namespace Services
                 PhysicalReads = physicalReads,
                 CpuTimeMs = cpuTime
             };
+        }
+
+       public string ApplyIndexHint(string query, string tableName, string indexName = null)
+        {
+            var safeTable = $"[{tableName}]";
+
+            var hint = indexName == null
+                ? "WITH (INDEX(0))"
+                : $"WITH (INDEX({indexName}))";
+            return query.Replace(
+                $"FROM {tableName}",
+                $"FROM {safeTable} {hint}"
+            );
         }
     }
 }

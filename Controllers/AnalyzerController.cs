@@ -49,9 +49,15 @@ public class AnalyzerController : ControllerBase
     }
     
     [HttpPost("metrics")]
-    public async Task<IActionResult> GetMetrics([FromBody] string query)
+    public async Task<IActionResult> GetMetrics([FromBody] QueryRequest request)
     {
-        var result = await _service.AnalyzeQueryWithMetrics(query);
+        var result = await _service.AnalyzeQueryWithMetrics(
+            request.Query,
+            request.TableName,
+            request.UseIndex,
+            request.IndexName
+        );
+
         return Ok(result);
     }
 }
