@@ -27,27 +27,12 @@ public class AnalyzerController : ControllerBase
     }
 
     [HttpPost("execution-plan")]
-    public async Task<IActionResult> GetExecutionPlan([FromBody] string query)
+    public async Task<IActionResult> GetExecutionPlan([FromBody] QueryRequestPlan query)
     {
-        var plan = await _service.GetExecutionPlan(query);
+        var plan = await _service.GetExecutionPlan(query.Query);
         return Ok(plan);
     }
 
-    [HttpPost("execution-plan-2")]
-    public async Task<IActionResult> GetPlan([FromBody] string query)
-    {
-        var xml = await _service.GetExecutionPlan(query);
-
-        var result = new ExecutionPlanResult
-        {
-            PlanXml = xml,
-            Warnings = _service.AnalyzeExecutionPlan(xml),
-            Score = _service.GetExecutionPlanScore(xml)
-        };
-
-        return Ok(result);
-    }
-    
     [HttpPost("metrics")]
     public async Task<IActionResult> GetMetrics([FromBody] QueryRequest request)
     {

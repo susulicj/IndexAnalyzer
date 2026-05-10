@@ -1,16 +1,19 @@
 using System.Data;
 using System.Diagnostics;
 using Microsoft.Data.SqlClient;
+using System.Xml.Linq;
+
 
 namespace Services
 {
     public class QueryAnalyzerService
     {
         private readonly string _connectionString;
-
-        public QueryAnalyzerService(IConfiguration config)
+        private readonly ExecutionPlanParser _parser;
+        public QueryAnalyzerService(IConfiguration config,  ExecutionPlanParser parser)
         {
             _connectionString = config.GetConnectionString("FakultetCS");
+            _parser = parser;
         }
 
 
@@ -35,7 +38,7 @@ namespace Services
         }
 
 
-        public async Task<string> GetExecutionPlan(string query)
+        public async Task<ExecutionPlanResult> GetExecutionPlan(string query)
         {
             using var conn = new SqlConnection(_connectionString);
             await conn.OpenAsync();
@@ -59,7 +62,9 @@ namespace Services
             using (var cmdOff = new SqlCommand("SET SHOWPLAN_XML OFF", conn))
                 await cmdOff.ExecuteNonQueryAsync();
 
-            return xml;
+            var parsedResult = _parser.Parse(xml);
+
+            return parsedResult;
         }
 
         public List<string> AnalyzeExecutionPlan(string xml)
@@ -88,12 +93,28 @@ namespace Services
         {
             int score = 100;
 
-            if (xml.Contains("TableScan")) score -= 40;
-            if (xml.Contains("ClusteredIndexScan")) score -= 30;
-            if (xml.Contains("KeyLookup")) score -= 15;
-            if (xml.Contains("HashMatch")) score -= 10;
+            var doc = XDocument.Parse(xml);
+            XNamespace ns = "http://schemas.microsoft.com/sqlserver/2004/07/showplan";
 
-            if (xml.Contains("IndexSeek")) score += 10;
+            var physicalOps = doc.Descendants(ns + "RelOp")
+                .Select(x => x.Attribute("PhysicalOp")?.Value)
+                .ToList();
+
+            if (physicalOps.Any(x => x == "Table Scan"))
+                score -= 40;
+
+            if (physicalOps.Any(x => x == "Clustered Index Scan"))
+                score -= 30;
+
+            if (physicalOps.Any(x => x == "Hash Match"))
+                score -= 10;
+
+            if (doc.Descendants(ns + "IndexScan")
+                .Any(x => x.Attribute("Lookup")?.Value == "1"))
+                score -= 15;
+
+            if (physicalOps.Any(x => x == "Index Seek"))
+                score += 10;
 
             return Math.Clamp(score, 0, 100);
         }

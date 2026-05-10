@@ -12,13 +12,14 @@ builder.Services.AddCors(options =>
     {
         policy.AllowAnyHeader()
               .AllowAnyMethod()
-              .WithOrigins("https://localhost:5555/",
-                           "https://localhost:5555/");
+              .WithOrigins("http://localhost:5173",
+                           "http://localhost:5555");
     });
 });
 
 builder.Services.AddControllers();
 builder.Services.AddScoped<QueryAnalyzerService>();
+builder.Services.AddScoped<ExecutionPlanParser>();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
