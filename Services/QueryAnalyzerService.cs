@@ -2,6 +2,7 @@ using System.Data;
 using System.Diagnostics;
 using Microsoft.Data.SqlClient;
 using System.Xml.Linq;
+using System.Text.RegularExpressions;
 
 
 namespace Services
@@ -155,11 +156,16 @@ namespace Services
             return result;
         }
 
-        public async Task<object> AnalyzeQueryWithMetrics(string query, string tableName, bool useIndex, string indexName = null)
+        public async Task<object> AnalyzeQueryWithMetrics(
+            string query,
+            string tableName,
+            bool useIndex,
+            string indexName = null)
         {
             using var conn = new SqlConnection(_connectionString);
 
             string messages = "";
+
             conn.FireInfoMessageEventOnUserErrors = true;
 
             conn.InfoMessage += (sender, e) =>
@@ -176,78 +182,85 @@ namespace Services
             );
 
             var cmdText = $@"
-            SET STATISTICS IO ON;
-            SET STATISTICS TIME ON;
+                SET STATISTICS IO ON;
+                SET STATISTICS TIME ON;
 
-            {modifiedQuery}
+                {modifiedQuery}
 
-            SET STATISTICS IO OFF;
-            SET STATISTICS TIME OFF;
+                SET STATISTICS IO OFF;
+                SET STATISTICS TIME OFF;
             ";
 
             var stopwatch = Stopwatch.StartNew();
 
             using var cmd = new SqlCommand(cmdText, conn);
+
             await cmd.ExecuteNonQueryAsync();
 
             stopwatch.Stop();
 
+            
+            var metrics = ParseMetrics(messages);
 
             return new
             {
                 UseIndex = useIndex,
+
                 ExecutionTimeMs = stopwatch.ElapsedMilliseconds,
-                RawMessages = messages
+
+                RawMessages = messages,
+
+                Metrics = metrics
             };
         }
-        private object ParseMetrics(string messages)
+        
+        private QueryMetricsDto ParseMetrics(string messages)
         {
-            int logicalReads = 0;
-            int physicalReads = 0;
-            int cpuTime = 0;
+            var result = new QueryMetricsDto();
 
-            var lines = messages.Split('\n');
-
-            foreach (var line in lines)
+            var logicalReadsMatch = Regex.Match(messages, @"logical reads (\d+)");
+            if (logicalReadsMatch.Success)
             {
-                if (line.Contains("logical reads"))
-                {
-                    var parts = line.Split(',');
-
-                    foreach (var p in parts)
-                    {
-                        if (p.Contains("logical reads"))
-                        {
-                            var val = p.Split('=')[1].Trim();
-                            logicalReads = int.Parse(val);
-                        }
-
-                        if (p.Contains("physical reads"))
-                        {
-                            var val = p.Split('=')[1].Trim();
-                            physicalReads = int.Parse(val);
-                        }
-                    }
-                }
-
-                if (line.Contains("CPU time"))
-                {
-                    var parts = line.Split(',');
-
-                    var cpuPart = parts[0].Split('=')[1]
-                        .Replace("ms", "")
-                        .Trim();
-
-                    cpuTime = int.Parse(cpuPart);
-                }
+                result.LogicalReads =
+                    int.Parse(logicalReadsMatch.Groups[1].Value);
             }
 
-            return new
+            var physicalReadsMatch = Regex.Match(messages, @"physical reads (\d+)");
+            if (physicalReadsMatch.Success)
             {
-                LogicalReads = logicalReads,
-                PhysicalReads = physicalReads,
-                CpuTimeMs = cpuTime
-            };
+                result.PhysicalReads =
+                    int.Parse(physicalReadsMatch.Groups[1].Value);
+            }
+
+            var scanCountMatch = Regex.Match(messages, @"Scan count (\d+)");
+            if (scanCountMatch.Success)
+            {
+                result.ScanCount =
+                    int.Parse(scanCountMatch.Groups[1].Value);
+            }
+
+            var readAheadMatch = Regex.Match(messages, @"read-ahead reads (\d+)");
+            if (readAheadMatch.Success)
+            {
+                result.ReadAheadReads =
+                    int.Parse(readAheadMatch.Groups[1].Value);
+            }
+
+            var cpuMatch = Regex.Match(messages, @"CPU time = (\d+) ms");
+            if (cpuMatch.Success)
+            {
+                result.CpuTimeMs =
+                    int.Parse(cpuMatch.Groups[1].Value);
+            }
+
+            var elapsedMatch = Regex.Match(messages, @"elapsed time = (\d+) ms");
+            if (elapsedMatch.Success)
+            {
+                result.ElapsedTimeMs =
+                    int.Parse(elapsedMatch.Groups[1].Value);
+            }
+
+            return result;
         }
 
        public string ApplyIndexHint(string query, string tableName, string indexName = null)

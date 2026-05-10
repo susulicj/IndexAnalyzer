@@ -3,27 +3,50 @@ export default function ResultView({ data }) {
 
     return (
         <div style={{ padding: "20px" }}>
-            <h2>Execution Plan Result</h2>
+            <h2>Execution Plan Analysis</h2>
 
-            <h3>Operators</h3>
-            <ul>
-                {data.logicalOpList.map((op, i) => (
-                    <li key={i}>{op}</li>
-                ))}
-            </ul>
+            <table border="1" cellPadding="10">
+                <thead>
+                    <tr>
+                        <th>Logical Operator</th>
+                        <th>Physical Operator</th>
+                        <th>Index</th>
+                        <th>Warning</th>
+                        <th>Total Cost</th>
+                        <th>Estimated Rows</th>
+                        <th>Index Seek</th>
+                        <th>Table Scan</th>
+                        <th>Key Lookup</th>
+                        <th>Join Type</th>
+                    </tr>
+                </thead>
 
-            <h3>Warnings</h3>
-            <ul>
-                {data.warnings.map((w, i) => (
-                    <li key={i} style={{ color: "red" }}>{w}</li>
-                ))}
-            </ul>
+                <tbody>
+                    <tr>
+                        <td>{data.logicalOpList.join(", ")}</td>
 
-            <h3>Metrics</h3>
-            <p>Cost: {data.totalCost}</p>
-            <p>Estimated Rows: {data.estimatedRows}</p>
+                        <td>{data.physicalOpList.join(", ")}</td>
 
-           
+                        <td>{data.indexes.join(", ")}</td>
+
+                        <td style={{ color: "red" }}>
+                            {data.warnings.join(", ")}
+                        </td>
+
+                        <td>{data.totalCost}</td>
+
+                        <td>{data.estimatedRows}</td>
+
+                        <td>{data.hasIndexSeek ? "Yes" : "No"}</td>
+
+                        <td>{data.hasTableScan ? "Yes" : "No"}</td>
+
+                        <td>{data.hasKeyLookup ? "Yes" : "No"}</td>
+
+                        <td>{data.joinType || "None"}</td>
+                    </tr>
+                </tbody>
+            </table>
         </div>
     );
 }
