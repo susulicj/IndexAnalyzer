@@ -1,18 +1,43 @@
 import { useState } from "react";
-import { analyzeQuery } from "./api";
+
+import {
+    getExecutionPlan,
+    getMetrics
+} from "./api";
+
 import ResultView from "./components/ResultView";
 
 export default function App() {
+
     const [query, setQuery] = useState("");
-    const [result, setResult] = useState(null);
+
+    const [planData, setPlanData] = useState(null);
+
+    const [metricsData, setMetricsData] = useState(null);
 
     const handleSubmit = async () => {
-        const data = await analyzeQuery(query);
-        setResult(data);
+
+        try {
+
+            const [plan, metrics] = await Promise.all([
+                getExecutionPlan(query),
+                getMetrics(query)
+            ]);
+
+            setPlanData(plan);
+
+            setMetricsData(metrics);
+
+        } catch (err) {
+
+            console.error(err);
+        }
     };
 
     return (
+
         <div style={{ padding: "20px" }}>
+
             <h1>Index Analyzer</h1>
 
             <textarea
@@ -29,7 +54,11 @@ export default function App() {
                 Analyze
             </button>
 
-            <ResultView data={result} />
+            <ResultView
+                data={planData}
+                metrics={metricsData}
+            />
+
         </div>
     );
 }

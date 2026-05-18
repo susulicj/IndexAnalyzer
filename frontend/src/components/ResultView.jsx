@@ -1,11 +1,17 @@
-export default function ResultView({ data }) {
+import MetricsChart from "./MetricsChart";
+
+export default function ResultView({ data, metrics }) {
+
     if (!data) return null;
 
     return (
+
         <div style={{ padding: "20px" }}>
+
             <h2>Execution Plan Analysis</h2>
 
             <table border="1" cellPadding="10">
+
                 <thead>
                     <tr>
                         <th>Logical Operator</th>
@@ -22,31 +28,64 @@ export default function ResultView({ data }) {
                 </thead>
 
                 <tbody>
+
                     <tr>
-                        <td>{data.logicalOpList.join(", ")}</td>
 
-                        <td>{data.physicalOpList.join(", ")}</td>
+                        <td>
+                            {data.logicalOpList.join(", ")}
+                        </td>
 
-                        <td>{data.indexes.join(", ")}</td>
+                        <td>
+                            {data.physicalOpList.join(", ")}
+                        </td>
+
+                        <td>
+                            {data.indexes.join(", ")}
+                        </td>
 
                         <td style={{ color: "red" }}>
                             {data.warnings.join(", ")}
                         </td>
 
-                        <td>{data.totalCost}</td>
+                        <td>
+                            {data.totalCost}
+                        </td>
 
-                        <td>{data.estimatedRows}</td>
+                        <td>
+                            {data.estimatedRows}
+                        </td>
 
-                        <td>{data.hasIndexSeek ? "Yes" : "No"}</td>
+                        <td>
+                            {data.hasIndexSeek ? "Yes" : "No"}
+                        </td>
 
-                        <td>{data.hasTableScan ? "Yes" : "No"}</td>
+                        <td>
+                            {data.hasTableScan ? "Yes" : "No"}
+                        </td>
 
-                        <td>{data.hasKeyLookup ? "Yes" : "No"}</td>
+                        <td>
+                            {data.hasKeyLookup ? "Yes" : "No"}
+                        </td>
 
-                        <td>{data.joinType || "None"}</td>
+                        <td>
+                            {data.joinType || "None"}
+                        </td>
+
                     </tr>
+
                 </tbody>
+
             </table>
+
+            <h2 style={{ marginTop: "40px" }}>
+                Performance Metrics
+            </h2>
+
+            {
+                metrics &&
+                <MetricsChart metrics={metrics.metrics} />
+            }
+
         </div>
     );
 }
